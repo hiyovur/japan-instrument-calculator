@@ -114,7 +114,7 @@
         <div id="bestSummary" class="text-sm font-bold px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700"></div>
       </div>
       <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600">
-        <div class="rounded-2xl bg-slate-50 p-4">현지 직접 구매: $800 초과분에만 관부가세. 관세 자진신고 감면은 관세액의 30%, 최대 ₩200,000.</div>
+        <div class="rounded-2xl bg-slate-50 p-4">현지 직접 구매: 일본 소비세 면세 후 $800 초과분에 여행자 휴대품 간이세율 15% 적용, 자진신고 시 산출세액의 30% 감면(최대 ₩200,000).</div>
         <div class="rounded-2xl bg-slate-50 p-4">해외 직구: $150 초과 시 과세 대상. 관세 8% + 부가세 10%로 단순 추정. 국제배송·배대지 포함.</div>
         <div class="rounded-2xl bg-slate-50 p-4">구매대행: 제공하신 견적서를 기준으로 수수료·포장·국제운송을 원가 비율에 맞춰 추정.</div>
         <div class="rounded-2xl bg-slate-50 p-4">모든 숫자는 반올림해 표시하며, 실제 관세청 과세가격은 운임·환율·품목 분류 등에 따라 달라질 수 있습니다.</div>
@@ -177,22 +177,25 @@ function calcA(x) {
   const itemBaseKrw = yenToKrw(itemBaseJpy, x.krw100);
   const thresholdKrw = usdToKrw(800, x.krwUsd);
   const excessKrw = Math.max(0, itemBaseKrw - thresholdKrw);
-  const duty = customsTax(excessKrw);
-  const relief = Math.min(duty * 0.30, 200000);
-  const dutyAfter = Math.max(0, duty - relief);
-  const vat = koreaVat(excessKrw + dutyAfter);
-  const total = itemBaseKrw + dutyAfter + vat;
+
+  // 현지 직접 반입: 여행자 휴대품 간이세율 15%
+  // 자진신고 시 산출세액의 30% 감면, 최대 20만원
+  const simpleTax = excessKrw * 0.15;
+  const relief = Math.min(simpleTax * 0.30, 200000);
+  const taxAfterRelief = Math.max(0, simpleTax - relief);
+  const total = itemBaseKrw + taxAfterRelief;
+
   return {
     title: '현지 직접 구매', subtitle: '일본 여행 후 직접 반입',
-    itemBaseJpy, grossUsd, duty, relief, vat, shipping: 0, fees: 0, total,
+    itemBaseJpy, grossUsd,
+    duty: simpleTax, relief, vat: 0, shipping: 0, fees: 0, total,
     lines: [
-      ['물품 가격', yenToKrw(itemBaseJpy, x.krw100), itemBaseJpy, yenToUsd(itemBaseJpy, x.usd100)],
+      ['물품 가격', itemBaseKrw, itemBaseJpy, yenToUsd(itemBaseJpy, x.usd100)],
       ['면세 한도', thresholdKrw, krwToJpy(thresholdKrw, x.krw100), 800],
       ['과세 대상 초과분', excessKrw, krwToJpy(excessKrw, x.krw100), excessKrw / x.krwUsd],
-      ['관세 8%', duty, krwToJpy(duty, x.krw100), duty / x.krwUsd],
+      ['간이세율 15%', simpleTax, krwToJpy(simpleTax, x.krw100), simpleTax / x.krwUsd],
       ['자진신고 감면 (-30%, 최대 20만원)', -relief, -krwToJpy(relief, x.krw100), -relief / x.krwUsd],
-      ['부가세 10%', vat, krwToJpy(vat, x.krw100), vat / x.krwUsd],
-      ['배송/수수료', 0, 0, 0],
+      ['최종 세금', taxAfterRelief, krwToJpy(taxAfterRelief, x.krw100), taxAfterRelief / x.krwUsd],
     ]
   };
 }
@@ -280,8 +283,8 @@ function renderCard(targetId, data, color = 'slate') {
         <div class="text-sm text-slate-300 mt-1 num">¥${jpy(krwToJpy(data.total, currentRates().krw100))} · ${usd(data.total / currentRates().krwUsd)}</div>
       </div>
       <div class="grid grid-cols-3 gap-2 mt-4 text-center">
-        <div class="rounded-2xl bg-slate-50 p-3"><div class="text-[11px] text-slate-400">관세</div><div class="font-bold num">₩${won(data.duty)}</div></div>
-        <div class="rounded-2xl bg-slate-50 p-3"><div class="text-[11px] text-slate-400">부가세</div><div class="font-bold num">₩${won(data.vat)}</div></div>
+        <div class="rounded-2xl bg-slate-50 p-3"><div class="text-[11px] text-slate-400">${data.title === '현지 직접 구매' ? '간이세액' : '관세'}</div><div class="font-bold num">₩${won(data.duty)}</div></div>
+        <div class="rounded-2xl bg-slate-50 p-3"><div class="text-[11px] text-slate-400">${data.title === '현지 직접 구매' ? '자진신고 감면' : '부가세'}</div><div class="font-bold num">${data.title === '현지 직접 구매' ? '-₩' + won(data.relief) : '₩' + won(data.vat)}</div></div>
         <div class="rounded-2xl bg-slate-50 p-3"><div class="text-[11px] text-slate-400">수수료/배송</div><div class="font-bold num">₩${won(data.fees || 0)}</div></div>
       </div>
       <details class="mt-5 border-t border-slate-200 pt-4">
