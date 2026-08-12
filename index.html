@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>일본 악기 통합 총비용 계산기</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          boxShadow: {
+            soft: '0 10px 30px rgba(15, 23, 42, .08)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display:none; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+    <header class="mb-6">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-semibold mb-3">
+            JAPAN INSTRUMENT COST CALCULATOR
+          </div>
+          <h1 class="text-3xl sm:text-4xl font-black tracking-tight">일본 악기 · 기타 통합 총비용 계산기</h1>
+          <p class="text-slate-500 mt-2">현지 구매 / 해외 직구 / 구매대행의 실제 예상 지출을 한 화면에서 비교합니다.</p>
+        </div>
+        <div id="fxStatus" class="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">환율을 불러오는 중...</div>
+      </div>
+    </header>
+
+    <section class="bg-white rounded-3xl shadow-soft border border-slate-200 p-5 sm:p-6 mb-6">
+      <div class="flex items-center justify-between gap-4 mb-5">
+        <div>
+          <h2 class="text-lg font-bold">공통 입력</h2>
+          <p class="text-sm text-slate-500 mt-1">값을 바꾸면 아래 3개 카드가 즉시 다시 계산됩니다.</p>
+        </div>
+        <button id="refreshFx" class="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition">환율 새로고침</button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <label class="block">
+          <span class="text-sm font-semibold text-slate-700">엔화 원가 (JPY)</span>
+          <div class="mt-2 relative">
+            <input id="priceJpy" type="number" min="0" step="100" value="110000" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 pr-14 outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 num" />
+            <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-semibold">¥</span>
+          </div>
+        </label>
+
+        <label class="block">
+          <span class="text-sm font-semibold text-slate-700">100엔당 KRW</span>
+          <input id="krwPer100Jpy" type="number" min="0" step="0.01" value="930" class="mt-2 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 num" />
+        </label>
+
+        <label class="block">
+          <span class="text-sm font-semibold text-slate-700">1달러당 KRW</span>
+          <input id="krwPerUsd" type="number" min="0" step="0.1" value="1380" class="mt-2 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 num" />
+        </label>
+
+        <label class="block">
+          <span class="text-sm font-semibold text-slate-700">100엔당 USD</span>
+          <input id="usdPer100Jpy" type="number" min="0" step="0.0001" value="0.0725" class="mt-2 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 num" />
+        </label>
+      </div>
+
+      <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <div class="font-semibold">일본 소비세 10% 면세</div>
+              <div class="text-xs text-slate-500 mt-1">일본 현지 구매/직구 원가에서 소비세 10%를 제외할지 선택</div>
+            </div>
+            <button id="taxFreeToggle" type="button" aria-pressed="true" class="relative w-14 h-8 rounded-full bg-slate-900 transition shrink-0">
+              <span id="taxKnob" class="absolute top-1 left-7 w-6 h-6 rounded-full bg-white shadow"></span>
+            </button>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <div class="font-semibold">구매대행 카드 결제 수수료 4.4%</div>
+              <div class="text-xs text-slate-500 mt-1">카드 결제 선택 시 대행 최종 금액에 4.4% 가산</div>
+            </div>
+            <button id="cardFeeToggle" type="button" aria-pressed="false" class="relative w-14 h-8 rounded-full bg-slate-300 transition shrink-0">
+              <span id="cardKnob" class="absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div id="cardA" class="bg-white rounded-3xl shadow-soft border border-slate-200 overflow-hidden"></div>
+      <div id="cardB" class="bg-white rounded-3xl shadow-soft border border-slate-200 overflow-hidden"></div>
+      <div id="cardC" class="bg-white rounded-3xl shadow-soft border border-slate-200 overflow-hidden"></div>
+    </section>
+
+    <section class="mt-6 bg-white rounded-3xl shadow-soft border border-slate-200 p-5 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <h2 class="text-lg font-bold">계산 기준</h2>
+          <p class="text-sm text-slate-500 mt-1">기본값은 입력하신 조건에 맞춘 추정치입니다. 실제 통관·배송·대행사 정책에 따라 달라질 수 있습니다.</p>
+        </div>
+        <div id="bestSummary" class="text-sm font-bold px-3 py-2 rounded-xl bg-emerald-50 text-emerald-700"></div>
+      </div>
+      <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600">
+        <div class="rounded-2xl bg-slate-50 p-4">현지 직접 구매: $800 초과분에만 관부가세. 관세 자진신고 감면은 관세액의 30%, 최대 ₩200,000.</div>
+        <div class="rounded-2xl bg-slate-50 p-4">해외 직구: $150 초과 시 과세 대상. 관세 8% + 부가세 10%로 단순 추정. 국제배송·배대지 포함.</div>
+        <div class="rounded-2xl bg-slate-50 p-4">구매대행: 제공하신 견적서를 기준으로 수수료·포장·국제운송을 원가 비율에 맞춰 추정.</div>
+        <div class="rounded-2xl bg-slate-50 p-4">모든 숫자는 반올림해 표시하며, 실제 관세청 과세가격은 운임·환율·품목 분류 등에 따라 달라질 수 있습니다.</div>
+      </div>
+    </section>
+
+    <footer class="mt-6 text-center text-xs text-slate-400">환율 API: open.er-api.com · 브라우저에서 직접 호출</footer>
+  </div>
+
+<script>
+const state = {
+  taxFree: true,
+  cardFee: false,
+  fxLoaded: false,
+  jpyKrw: 930,
+  usdKrw: 1380,
+  usdPer100Jpy: 0.0725,
+};
+
+const el = id => document.getElementById(id);
+const n = v => Number(v) || 0;
+const won = v => new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(Math.round(v));
+const jpy = v => new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 0 }).format(Math.round(v));
+const usd = v => '$' + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+
+function inputs() {
+  return {
+    priceJpy: n(el('priceJpy').value),
+    krw100: n(el('krwPer100Jpy').value),
+    krwUsd: n(el('krwPerUsd').value),
+    usd100: n(el('usdPer100Jpy').value),
+  };
+}
+
+function yenToKrw(x, rate100) { return x * rate100 / 100; }
+function yenToUsd(x, usd100) { return x * usd100 / 100; }
+function usdToKrw(x, rate) { return x * rate; }
+function krwToJpy(x, rate100) { return rate100 ? x * 100 / rate100 : 0; }
+
+function koreaVat(taxBase) { return taxBase * 0.10; }
+function japanNetPrice(grossJpy) { return grossJpy / 1.10; }
+function japanPurchasePrice(grossJpy) { return state.taxFree ? japanNetPrice(grossJpy) : grossJpy; }
+function customsTax(base) { return base * 0.08; }
+
+// Approximation constants derived directly from the supplied agency quote.
+// Quote reference: item 59,800 JPY, domestic 0, service 3,000 JPY, packing 600 JPY,
+// international shipping 4,217 JPY, customs+VAT 11,242 JPY, total 75,859 JPY.
+const agencyRef = {
+  item: 59800,
+  domestic: 0,
+  serviceGross: 3000,
+  packing: 600,
+  intlShipping: 4217,
+  customsVat: 11242,
+};
+
+function calcA(x) {
+  const grossUsd = yenToUsd(x.priceJpy, x.usd100);
+  const itemBaseJpy = japanPurchasePrice(x.priceJpy);
+  const itemBaseKrw = yenToKrw(itemBaseJpy, x.krw100);
+  const thresholdKrw = usdToKrw(800, x.krwUsd);
+  const excessKrw = Math.max(0, itemBaseKrw - thresholdKrw);
+  const duty = customsTax(excessKrw);
+  const relief = Math.min(duty * 0.30, 200000);
+  const dutyAfter = Math.max(0, duty - relief);
+  const vat = koreaVat(excessKrw + dutyAfter);
+  const total = itemBaseKrw + dutyAfter + vat;
+  return {
+    title: '현지 직접 구매', subtitle: '일본 여행 후 직접 반입',
+    itemBaseJpy, grossUsd, duty, relief, vat, shipping: 0, fees: 0, total,
+    lines: [
+      ['물품 가격', yenToKrw(itemBaseJpy, x.krw100), itemBaseJpy, yenToUsd(itemBaseJpy, x.usd100)],
+      ['면세 한도', thresholdKrw, krwToJpy(thresholdKrw, x.krw100), 800],
+      ['과세 대상 초과분', excessKrw, krwToJpy(excessKrw, x.krw100), excessKrw / x.krwUsd],
+      ['관세 8%', duty, krwToJpy(duty, x.krw100), duty / x.krwUsd],
+      ['자진신고 감면 (-30%, 최대 20만원)', -relief, -krwToJpy(relief, x.krw100), -relief / x.krwUsd],
+      ['부가세 10%', vat, krwToJpy(vat, x.krw100), vat / x.krwUsd],
+      ['배송/수수료', 0, 0, 0],
+    ]
+  };
+}
+
+function calcB(x) {
+  const grossUsd = yenToUsd(x.priceJpy, x.usd100);
+  const itemJpy = japanPurchasePrice(x.priceJpy);
+  // Default assumptions for user-editable shipment estimate.
+  const intlShippingJpy = 12000;
+  const forwarderJpy = 3000;
+  const taxableGoodsKrw = yenToKrw(itemJpy, x.krw100);
+  const thresholdKrw = usdToKrw(150, x.krwUsd);
+  const isTaxable = taxableGoodsKrw > thresholdKrw;
+  const customs = isTaxable ? customsTax(taxableGoodsKrw) : 0;
+  const vatBase = isTaxable ? taxableGoodsKrw + customs : 0;
+  const vat = koreaVat(vatBase);
+  const shippingKrw = yenToKrw(intlShippingJpy + forwarderJpy, x.krw100);
+  const total = taxableGoodsKrw + customs + vat + shippingKrw;
+  return {
+    title: '해외 직구', subtitle: '배대지 또는 직배송',
+    itemBaseJpy: itemJpy, grossUsd, duty: customs, relief: 0, vat, shipping: shippingKrw,
+    fees: shippingKrw, total,
+    lines: [
+      ['물품 가격', taxableGoodsKrw, itemJpy, yenToUsd(itemJpy, x.usd100)],
+      ['면세 한도', thresholdKrw, krwToJpy(thresholdKrw, x.krw100), 150],
+      ['관세 8%', customs, krwToJpy(customs, x.krw100), customs / x.krwUsd],
+      ['부가세 10%', vat, krwToJpy(vat, x.krw100), vat / x.krwUsd],
+      ['국제운송료', yenToKrw(intlShippingJpy, x.krw100), intlShippingJpy, yenToUsd(intlShippingJpy, x.usd100)],
+      ['배대지 수수료', yenToKrw(forwarderJpy, x.krw100), forwarderJpy, yenToUsd(forwarderJpy, x.usd100)],
+    ]
+  };
+}
+
+function calcC(x) {
+  const itemJpy = japanPurchasePrice(x.priceJpy);
+  const itemKrw = yenToKrw(itemJpy, x.krw100);
+  const thresholdKrw = usdToKrw(150, x.krwUsd);
+  const taxable = itemKrw > thresholdKrw;
+
+  // Scale the supplied quote's agency service-related costs by item price.
+  const ratio = agencyRef.item ? itemJpy / agencyRef.item : 1;
+  const serviceGrossJpy = agencyRef.serviceGross * ratio;
+  const packingJpy = agencyRef.packing * ratio;
+  const intlShipJpy = agencyRef.intlShipping * ratio;
+  const domesticJpy = agencyRef.domestic * ratio;
+
+  const customs = taxable ? customsTax(itemKrw) : 0;
+  const vat = taxable ? koreaVat(itemKrw + customs) : 0;
+  const customsVatJpy = krwToJpy(customs + vat, x.krw100);
+  const subtotalKrw = itemKrw + yenToKrw(domesticJpy + serviceGrossJpy + packingJpy + intlShipJpy, x.krw100) + customs + vat;
+  const cardFee = state.cardFee ? subtotalKrw * 0.044 : 0;
+  const total = subtotalKrw + cardFee;
+
+  return {
+    title: '구매대행', subtitle: '대행사 환율·수수료 기반 추정',
+    itemBaseJpy: itemJpy, grossUsd: yenToUsd(itemJpy, x.usd100), duty: customs, relief: 0, vat,
+    shipping: yenToKrw(intlShipJpy + domesticJpy, x.krw100), fees: yenToKrw(serviceGrossJpy + packingJpy, x.krw100), total,
+    lines: [
+      ['물품 가격', itemKrw, itemJpy, yenToUsd(itemJpy, x.usd100)],
+      ['면세 한도', thresholdKrw, krwToJpy(thresholdKrw, x.krw100), 150],
+      ['대행수수료', yenToKrw(serviceGrossJpy, x.krw100), serviceGrossJpy, yenToUsd(serviceGrossJpy, x.usd100)],
+      ['포장료', yenToKrw(packingJpy, x.krw100), packingJpy, yenToUsd(packingJpy, x.usd100)],
+      ['국내운송료', yenToKrw(domesticJpy, x.krw100), domesticJpy, yenToUsd(domesticJpy, x.usd100)],
+      ['국제운송료', yenToKrw(intlShipJpy, x.krw100), intlShipJpy, yenToUsd(intlShipJpy, x.usd100)],
+      ['관세 + 부가세', customs + vat, customsVatJpy, (customs + vat) / x.krwUsd],
+      ['카드결제 수수료 4.4%', cardFee, krwToJpy(cardFee, x.krw100), cardFee / x.krwUsd],
+    ]
+  };
+}
+
+function renderCard(targetId, data, color = 'slate') {
+  const card = el(targetId);
+  card.innerHTML = `
+    <div class="p-5 sm:p-6">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-sm font-semibold text-${color}-600">${data.title}</div>
+          <h3 class="text-lg font-black mt-1">${data.subtitle}</h3>
+        </div>
+        ${data.best ? '<span class="shrink-0 rounded-full bg-emerald-100 text-emerald-700 px-3 py-1 text-xs font-black">최저가 BEST</span>' : ''}
+      </div>
+      <div class="mt-5 rounded-2xl bg-slate-900 text-white p-5">
+        <div class="text-xs text-slate-300">최종 예상 비용</div>
+        <div class="text-3xl font-black mt-1 num">₩${won(data.total)}</div>
+        <div class="text-sm text-slate-300 mt-1 num">¥${jpy(krwToJpy(data.total, currentRates().krw100))} · ${usd(data.total / currentRates().krwUsd)}</div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+        <div class="rounded-2xl bg-slate-50 p-3"><div class="text-[11px] text-slate-400">관세</div><div class="font-bold num">₩${won(data.duty)}</div></div>
+        <div class="rounded-2xl bg-slate-50 p-3"><div class="text-[11px] text-slate-400">부가세</div><div class="font-bold num">₩${won(data.vat)}</div></div>
+        <div class="rounded-2xl bg-slate-50 p-3"><div class="text-[11px] text-slate-400">수수료/배송</div><div class="font-bold num">₩${won(data.fees || 0)}</div></div>
+      </div>
+      <details class="mt-5 border-t border-slate-200 pt-4">
+        <summary class="flex items-center justify-between cursor-pointer font-semibold text-sm">세부 내역 <span class="text-slate-400">⌄</span></summary>
+        <div class="mt-3 space-y-2">
+          ${data.lines.map(row => `
+            <div class="grid grid-cols-[1fr_auto] gap-3 items-start text-sm">
+              <div class="text-slate-600">${row[0]}</div>
+              <div class="text-right">
+                <div class="font-semibold num">₩${won(row[1])}</div>
+                <div class="text-xs text-slate-400 num">¥${jpy(row[2])} · ${usd(row[3])}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </details>
+    </div>`;
+}
+
+function currentRates() {
+  return {
+    krw100: n(el('krwPer100Jpy').value),
+    krwUsd: n(el('krwPerUsd').value),
+    usd100: n(el('usdPer100Jpy').value),
+  };
+}
+
+function render() {
+  const x = inputs();
+  if (!x.krw100 || !x.krwUsd || !x.usd100) return;
+  const a = calcA(x), b = calcB(x), c = calcC(x);
+  const items = [a,b,c];
+  const min = Math.min(...items.map(i => i.total));
+  items.forEach(i => i.best = Math.abs(i.total - min) < 0.5);
+  renderCard('cardA', a, 'slate');
+  renderCard('cardB', b, 'blue');
+  renderCard('cardC', c, 'violet');
+  const best = items.find(i => i.best);
+  el('bestSummary').textContent = `현재 최저가: ${best.title} · ₩${won(best.total)}`;
+}
+
+function setToggle(buttonId, knobId, active) {
+  const b = el(buttonId), k = el(knobId);
+  b.setAttribute('aria-pressed', String(active));
+  b.classList.toggle('bg-slate-900', active);
+  b.classList.toggle('bg-slate-300', !active);
+  k.classList.toggle('left-7', active);
+  k.classList.toggle('left-1', !active);
+}
+
+el('taxFreeToggle').addEventListener('click', () => {
+  state.taxFree = !state.taxFree;
+  setToggle('taxFreeToggle', 'taxKnob', state.taxFree);
+  render();
+});
+el('cardFeeToggle').addEventListener('click', () => {
+  state.cardFee = !state.cardFee;
+  setToggle('cardFeeToggle', 'cardKnob', state.cardFee);
+  render();
+});
+
+['priceJpy','krwPer100Jpy','krwPerUsd','usdPer100Jpy'].forEach(id => el(id).addEventListener('input', render));
+
+async function loadFx() {
+  el('fxStatus').textContent = '환율 조회 중...';
+  try {
+    const [jpyRes, usdRes] = await Promise.all([
+      fetch('https://open.er-api.com/v6/latest/JPY').then(r => r.json()),
+      fetch('https://open.er-api.com/v6/latest/USD').then(r => r.json())
+    ]);
+    if (jpyRes && jpyRes.result === 'success' && jpyRes.rates?.KRW) {
+      const jpyKrwPerJpy = Number(jpyRes.rates.KRW);
+      const usdKrw = usdRes?.rates?.KRW ? Number(usdRes.rates.KRW) : n(el('krwPerUsd').value);
+      const usdJpyPerJpy = usdRes?.rates?.JPY ? Number(usdRes.rates.JPY) : null;
+      el('krwPer100Jpy').value = (jpyKrwPerJpy * 100).toFixed(2);
+      el('krwPerUsd').value = usdKrw.toFixed(2);
+      if (usdJpyPerJpy) el('usdPer100Jpy').value = (1 / usdJpyPerJpy * 100).toFixed(4);
+      state.fxLoaded = true;
+      el('fxStatus').textContent = '실시간 환율 반영 완료 · 필요하면 직접 수정 가능';
+      render();
+    } else {
+      throw new Error('환율 응답 오류');
+    }
+  } catch (err) {
+    el('fxStatus').textContent = '환율 자동 조회 실패 · 입력값으로 계산 중';
+    render();
+  }
+}
+
+setToggle('taxFreeToggle', 'taxKnob', state.taxFree);
+setToggle('cardFeeToggle', 'cardKnob', state.cardFee);
+render();
+loadFx();
+el('refreshFx').addEventListener('click', loadFx);
+</script>
+</body>
+</html>
